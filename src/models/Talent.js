@@ -53,10 +53,26 @@ const talentSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  cv_pdf_base64: {
+    type: String,
+    default: null
+  },
+  cv_pdf_mimeType: {
+    type: String,
+    default: null
+  },
   video_presentation: {
     type: String
   },
   video_presentation_gridfs_id: {
+    type: String,
+    default: null
+  },
+  video_presentation_base64: {
+    type: String,
+    default: null
+  },
+  video_presentation_mimeType: {
     type: String,
     default: null
   },

@@ -1,7 +1,7 @@
 const Talent = require('../models/Talent');
 const Photo = require('../models/Photo');
 const { calculerTrancheAge } = require('../database/db');
-const gridfsService = require('../services/gridfsService');
+const cloudinaryService = require('../services/cloudinaryService');
 const path = require('path');
 const fs = require('fs-extra');
 
@@ -48,8 +48,13 @@ const getAllTalents = async (req, res) => {
     // Récupérer les photos pour chaque talent
     const talentsWithPhotos = await Promise.all(
       talents.map(async (talent) => {
-        const photos = await Photo.find({ talent_id: talent._id });
+        const photos = await Photo.find({ talent_id: talent._id }).select('-base64');
         const talentObj = talent.toObject();
+        
+        // Retirer les base64 pour économiser la bande passante
+        delete talentObj.cv_pdf_base64;
+        delete talentObj.video_presentation_base64;
+        
         return {
           ...talentObj,
           id: talentObj._id.toString(),
@@ -57,7 +62,7 @@ const getAllTalents = async (req, res) => {
           photos: photos.map(photo => ({
             ...photo.toObject(),
             id: photo._id.toString(),
-            gridfs_id: photo.gridfs_id || null
+            hasBase64: !!photo.base64 // Indique si base64 existe
           }))
         };
       })
@@ -80,9 +85,13 @@ const getTalentById = async (req, res) => {
       return res.status(404).json({ error: 'Talent non trouvé' });
     }
 
-    // Récupérer les photos
-    const photos = await Photo.find({ talent_id: talent._id });
+    // Récupérer les photos (sans base64 pour économiser la bande passante)
+    const photos = await Photo.find({ talent_id: talent._id }).select('-base64');
     const talentObj = talent.toObject();
+
+    // Retirer les base64 du talent pour économiser la bande passante
+    delete talentObj.cv_pdf_base64;
+    delete talentObj.video_presentation_base64;
 
     res.json({
       ...talentObj,
@@ -91,7 +100,7 @@ const getTalentById = async (req, res) => {
       photos: photos.map(photo => ({
         ...photo.toObject(),
         id: photo._id.toString(),
-        gridfs_id: photo.gridfs_id || null
+        hasBase64: !!photo.base64 // Indique si base64 existe sans l'envoyer
       }))
     });
   } catch (error) {
@@ -197,22 +206,22 @@ const deleteTalent = async (req, res) => {
     // Récupérer les chemins des fichiers associés
     const photos = await Photo.find({ talent_id: id });
 
-    // Supprimer les fichiers de GridFS
+    // Supprimer les fichiers de Cloudinary
     for (const photo of photos) {
       if (photo.gridfs_id) {
-        await gridfsService.deleteFile(photo.gridfs_id);
+        await cloudinaryService.deleteFile(photo.gridfs_id, 'image');
       }
     }
 
     // Supprimer les photos de la base de données
     await Photo.deleteMany({ talent_id: id });
     
-    // Supprimer le CV et la vidéo de GridFS si ils existent
+    // Supprimer le CV et la vidéo de Cloudinary si ils existent
     if (talent.cv_pdf_gridfs_id) {
-      await gridfsService.deleteFile(talent.cv_pdf_gridfs_id);
+      await cloudinaryService.deleteFile(talent.cv_pdf_gridfs_id, 'raw');
     }
     if (talent.video_presentation_gridfs_id) {
-      await gridfsService.deleteFile(talent.video_presentation_gridfs_id);
+      await cloudinaryService.deleteFile(talent.video_presentation_gridfs_id, 'video');
     }
 
     // Supprimer le talent

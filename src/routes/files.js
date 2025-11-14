@@ -1,20 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const gridfsService = require('../services/gridfsService');
 const Photo = require('../models/Photo');
 const Talent = require('../models/Talent');
 
-// Servir un fichier depuis GridFS par ID
-router.get('/:fileId', async (req, res) => {
-  try {
-    const { fileId } = req.params;
-    gridfsService.streamFile(fileId, res);
-  } catch (error) {
-    res.status(500).json({ error: 'Erreur lors de la récupération du fichier' });
-  }
-});
-
-// Route pour obtenir l'ID GridFS d'une photo
+// Route pour obtenir une photo en base64
 router.get('/photo/:photoId', async (req, res) => {
   try {
     const { photoId } = req.params;
@@ -24,20 +13,18 @@ router.get('/photo/:photoId', async (req, res) => {
       return res.status(404).json({ error: 'Photo non trouvée' });
     }
     
-    if (!photo.gridfs_id) {
-      // Fallback: essayer de servir depuis le chemin local si disponible
-      if (photo.chemin) {
-        return res.redirect(`/uploads/${photo.chemin}`);
-      }
-      return res.status(404).json({ error: 'Fichier non trouvé dans GridFS' });
+    if (!photo.base64) {
+      return res.status(404).json({ error: 'Photo non disponible' });
     }
     
-    await gridfsService.streamFile(photo.gridfs_id, res);
+    // Retourner directement le base64
+    res.json({
+      base64: photo.base64,
+      mimeType: photo.mimeType || 'image/jpeg'
+    });
   } catch (error) {
     console.error('Erreur récupération photo:', error);
-    if (!res.headersSent) {
-      res.status(500).json({ error: 'Erreur lors de la récupération de la photo' });
-    }
+    res.status(500).json({ error: 'Erreur lors de la récupération de la photo' });
   }
 });
 
@@ -47,20 +34,18 @@ router.get('/talent/:talentId/cv', async (req, res) => {
     const { talentId } = req.params;
     const talent = await Talent.findById(talentId);
     
-    if (!talent || !talent.cv_pdf_gridfs_id) {
-      // Fallback: essayer le chemin local
-      if (talent && talent.cv_pdf) {
-        return res.redirect(`/uploads/${talent.cv_pdf}`);
-      }
+    if (!talent || !talent.cv_pdf_base64) {
       return res.status(404).json({ error: 'CV non trouvé' });
     }
     
-    await gridfsService.streamFile(talent.cv_pdf_gridfs_id, res);
+    // Retourner directement le base64
+    res.json({
+      base64: talent.cv_pdf_base64,
+      mimeType: talent.cv_pdf_mimeType || 'application/pdf'
+    });
   } catch (error) {
     console.error('Erreur récupération CV:', error);
-    if (!res.headersSent) {
-      res.status(500).json({ error: 'Erreur lors de la récupération du CV' });
-    }
+    res.status(500).json({ error: 'Erreur lors de la récupération du CV' });
   }
 });
 
@@ -70,22 +55,19 @@ router.get('/talent/:talentId/video', async (req, res) => {
     const { talentId } = req.params;
     const talent = await Talent.findById(talentId);
     
-    if (!talent || !talent.video_presentation_gridfs_id) {
-      // Fallback: essayer le chemin local
-      if (talent && talent.video_presentation) {
-        return res.redirect(`/uploads/${talent.video_presentation}`);
-      }
+    if (!talent || !talent.video_presentation_base64) {
       return res.status(404).json({ error: 'Vidéo non trouvée' });
     }
     
-    await gridfsService.streamFile(talent.video_presentation_gridfs_id, res);
+    // Retourner directement le base64
+    res.json({
+      base64: talent.video_presentation_base64,
+      mimeType: talent.video_presentation_mimeType || 'video/mp4'
+    });
   } catch (error) {
     console.error('Erreur récupération vidéo:', error);
-    if (!res.headersSent) {
-      res.status(500).json({ error: 'Erreur lors de la récupération de la vidéo' });
-    }
+    res.status(500).json({ error: 'Erreur lors de la récupération de la vidéo' });
   }
 });
 
 module.exports = router;
-

@@ -1,11 +1,9 @@
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs-extra');
 const Photo = require('../models/Photo');
 const Talent = require('../models/Talent');
-const gridfsService = require('../services/gridfsService');
 
-// Configuration du stockage en mémoire (pour GridFS)
+// Configuration du stockage en mémoire (pour base64)
 const storage = multer.memoryStorage();
 
 // Filtre des types de fichiers
@@ -45,10 +43,16 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 50 * 1024 * 1024 // 50MB
+    fileSize: 10 * 1024 * 1024 // 10MB max (base64 prend plus de place)
   },
   fileFilter: fileFilter
 });
+
+// Convertir buffer en base64
+const bufferToBase64 = (buffer, mimeType) => {
+  const base64 = buffer.toString('base64');
+  return `data:${mimeType};base64,${base64}`;
+};
 
 // Upload de photos
 const uploadPhoto = async (req, res) => {
@@ -60,34 +64,31 @@ const uploadPhoto = async (req, res) => {
       return res.status(400).json({ error: 'Aucun fichier uploadé' });
     }
 
-    // Générer un nom de fichier unique
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(req.file.originalname);
-    const filename = `photo-${id}-${uniqueSuffix}${ext}`;
-
-    // Uploader dans GridFS
     // Convertir ArrayBuffer en Buffer si nécessaire
     const fileBuffer = req.file.buffer instanceof Buffer 
       ? req.file.buffer 
       : Buffer.from(req.file.buffer);
-    
-    const result = await gridfsService.uploadFile(
-      fileBuffer,
-      filename,
-      {
-        talent_id: id,
-        expression: expression || null,
-        contentType: req.file.mimetype,
-        type: 'photo'
-      }
-    );
+
+    // Vérifier la taille (max 10MB pour base64)
+    if (fileBuffer.length > 10 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Fichier trop volumineux (max 10MB)' });
+    }
+
+    // Convertir en base64
+    const base64String = bufferToBase64(fileBuffer, req.file.mimetype);
+
+    // Générer un nom de fichier unique
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(req.file.originalname);
+    const filename = `photo-${id}-${expression || 'default'}-${uniqueSuffix}${ext}`;
 
     // Enregistrer dans la base de données
     const photo = await Photo.create({
       talent_id: id,
       expression: expression || null,
       chemin: filename, // Garde pour compatibilité
-      gridfs_id: result.fileId
+      base64: base64String,
+      mimeType: req.file.mimetype
     });
 
     res.status(201).json({
@@ -95,8 +96,7 @@ const uploadPhoto = async (req, res) => {
       photo: {
         id: photo._id,
         talent_id: id,
-        expression: expression || null,
-        gridfs_id: result.fileId
+        expression: expression || null
       }
     });
   } catch (error) {
@@ -114,52 +114,42 @@ const uploadVideo = async (req, res) => {
       return res.status(400).json({ error: 'Aucun fichier uploadé' });
     }
 
-    // Générer un nom de fichier unique
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(req.file.originalname);
-    const filename = `video-${id}-${uniqueSuffix}${ext}`;
-
-    // Supprimer l'ancienne vidéo si elle existe
-    const talent = await Talent.findById(id);
-    if (talent && talent.video_presentation_gridfs_id) {
-      await gridfsService.deleteFile(talent.video_presentation_gridfs_id);
-    }
-
-    // Uploader dans GridFS
     // Convertir ArrayBuffer en Buffer si nécessaire
     const fileBuffer = req.file.buffer instanceof Buffer 
       ? req.file.buffer 
       : Buffer.from(req.file.buffer);
-    
-    const result = await gridfsService.uploadFile(
-      fileBuffer,
-      filename,
-      {
-        talent_id: id,
-        contentType: req.file.mimetype,
-        type: 'video'
-      }
-    );
+
+    // Vérifier la taille (max 10MB pour base64)
+    if (fileBuffer.length > 10 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Fichier trop volumineux (max 10MB)' });
+    }
+
+    // Convertir en base64
+    const base64String = bufferToBase64(fileBuffer, req.file.mimetype);
+
+    // Générer un nom de fichier unique
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(req.file.originalname);
+    const filename = `video-${id}-${uniqueSuffix}${ext}`;
 
     // Mettre à jour le talent
     const updatedTalent = await Talent.findByIdAndUpdate(
       id,
       {
         video_presentation: filename, // Garde pour compatibilité
-        video_presentation_gridfs_id: result.fileId
+        video_presentation_base64: base64String,
+        video_presentation_mimeType: req.file.mimetype
       },
       { new: true }
     );
 
     if (!updatedTalent) {
-      await gridfsService.deleteFile(result.fileId);
       return res.status(404).json({ error: 'Talent non trouvé' });
     }
 
     res.json({
       message: 'Vidéo uploadée avec succès',
-      video_path: filename,
-      gridfs_id: result.fileId
+      video_path: filename
     });
   } catch (error) {
     console.error('Erreur upload video:', error);
@@ -176,52 +166,42 @@ const uploadCV = async (req, res) => {
       return res.status(400).json({ error: 'Aucun fichier uploadé' });
     }
 
-    // Générer un nom de fichier unique
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(req.file.originalname);
-    const filename = `cv-${id}-${uniqueSuffix}${ext}`;
-
-    // Supprimer l'ancien CV s'il existe
-    const talent = await Talent.findById(id);
-    if (talent && talent.cv_pdf_gridfs_id) {
-      await gridfsService.deleteFile(talent.cv_pdf_gridfs_id);
-    }
-
-    // Uploader dans GridFS
     // Convertir ArrayBuffer en Buffer si nécessaire
     const fileBuffer = req.file.buffer instanceof Buffer 
       ? req.file.buffer 
       : Buffer.from(req.file.buffer);
-    
-    const result = await gridfsService.uploadFile(
-      fileBuffer,
-      filename,
-      {
-        talent_id: id,
-        contentType: req.file.mimetype,
-        type: 'cv_pdf'
-      }
-    );
+
+    // Vérifier la taille (max 10MB pour base64)
+    if (fileBuffer.length > 10 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Fichier trop volumineux (max 10MB)' });
+    }
+
+    // Convertir en base64
+    const base64String = bufferToBase64(fileBuffer, req.file.mimetype);
+
+    // Générer un nom de fichier unique
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(req.file.originalname);
+    const filename = `cv-${id}-${uniqueSuffix}${ext}`;
 
     // Mettre à jour le talent
     const updatedTalent = await Talent.findByIdAndUpdate(
       id,
       {
         cv_pdf: filename, // Garde pour compatibilité
-        cv_pdf_gridfs_id: result.fileId
+        cv_pdf_base64: base64String,
+        cv_pdf_mimeType: req.file.mimetype
       },
       { new: true }
     );
 
     if (!updatedTalent) {
-      await gridfsService.deleteFile(result.fileId);
       return res.status(404).json({ error: 'Talent non trouvé' });
     }
 
     res.json({
       message: 'CV PDF uploadé avec succès',
-      cv_pdf: filename,
-      gridfs_id: result.fileId
+      cv_pdf: filename
     });
   } catch (error) {
     console.error('Erreur upload CV:', error);
@@ -238,11 +218,6 @@ const deletePhoto = async (req, res) => {
 
     if (!photo) {
       return res.status(404).json({ error: 'Photo non trouvée' });
-    }
-
-    // Supprimer de GridFS si gridfs_id existe
-    if (photo.gridfs_id) {
-      await gridfsService.deleteFile(photo.gridfs_id);
     }
 
     // Supprimer de la base de données
