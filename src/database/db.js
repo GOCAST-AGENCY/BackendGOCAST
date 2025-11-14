@@ -17,6 +17,10 @@ const connectDB = async () => {
     await mongoose.connect(config.database.url);
     console.log('✅ Connexion à MongoDB établie');
     
+    // Initialiser GridFS après la connexion
+    const gridfsService = require('../services/gridfsService');
+    gridfsService.initGridFS();
+    
     // Créer l'admin par défaut si nécessaire
     await createDefaultAdmin();
   } catch (error) {

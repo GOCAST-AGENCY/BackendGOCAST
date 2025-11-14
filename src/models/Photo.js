@@ -14,6 +14,10 @@ const photoSchema = new mongoose.Schema({
   chemin: {
     type: String,
     required: true
+  },
+  gridfs_id: {
+    type: String,
+    default: null
   }
 }, {
   timestamps: true

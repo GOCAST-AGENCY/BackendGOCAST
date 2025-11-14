@@ -60,7 +60,10 @@ app.get('/health', (req, res) => {
 // Routes API
 app.use('/api', routes);
 
-// Servir les fichiers uploadés
+// Servir les fichiers depuis GridFS
+app.use('/api/files', require('./routes/files'));
+
+// Servir les fichiers uploadés (fallback pour compatibilité locale)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Gestion des erreurs 404

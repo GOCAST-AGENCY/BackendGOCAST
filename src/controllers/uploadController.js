@@ -3,29 +3,10 @@ const path = require('path');
 const fs = require('fs-extra');
 const Photo = require('../models/Photo');
 const Talent = require('../models/Talent');
+const gridfsService = require('../services/gridfsService');
 
-// Configuration du stockage
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadsDir = path.join(__dirname, '../../uploads');
-    let subDir = 'photos';
-    
-    if (file.fieldname === 'video') {
-      subDir = 'videos';
-    } else if (file.fieldname === 'cv_pdf') {
-      subDir = 'cvs';
-    }
-    
-    const dir = path.join(uploadsDir, subDir);
-    fs.ensureDirSync(dir);
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname);
-    cb(null, `talent-${req.params.id || 'new'}-${uniqueSuffix}${ext}`);
-  }
-});
+// Configuration du stockage en mémoire (pour GridFS)
+const storage = multer.memoryStorage();
 
 // Filtre des types de fichiers
 const fileFilter = (req, file, cb) => {
@@ -79,12 +60,29 @@ const uploadPhoto = async (req, res) => {
       return res.status(400).json({ error: 'Aucun fichier uploadé' });
     }
 
-    const relativePath = path.join('photos', req.file.filename);
+    // Générer un nom de fichier unique
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(req.file.originalname);
+    const filename = `photo-${id}-${uniqueSuffix}${ext}`;
 
+    // Uploader dans GridFS
+    const result = await gridfsService.uploadFile(
+      req.file.buffer,
+      filename,
+      {
+        talent_id: id,
+        expression: expression || null,
+        contentType: req.file.mimetype,
+        type: 'photo'
+      }
+    );
+
+    // Enregistrer dans la base de données
     const photo = await Photo.create({
       talent_id: id,
       expression: expression || null,
-      chemin: relativePath
+      chemin: filename, // Garde pour compatibilité
+      gridfs_id: result.fileId
     });
 
     res.status(201).json({
@@ -93,14 +91,11 @@ const uploadPhoto = async (req, res) => {
         id: photo._id,
         talent_id: id,
         expression: expression || null,
-        chemin: relativePath
+        gridfs_id: result.fileId
       }
     });
   } catch (error) {
-    // Supprimer le fichier en cas d'erreur
-    if (req.file) {
-      fs.removeSync(req.file.path);
-    }
+    console.error('Erreur upload photo:', error);
     res.status(500).json({ error: 'Erreur lors de l\'enregistrement de la photo' });
   }
 };
@@ -114,27 +109,50 @@ const uploadVideo = async (req, res) => {
       return res.status(400).json({ error: 'Aucun fichier uploadé' });
     }
 
-    const relativePath = path.join('videos', req.file.filename);
+    // Générer un nom de fichier unique
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(req.file.originalname);
+    const filename = `video-${id}-${uniqueSuffix}${ext}`;
 
-    const talent = await Talent.findByIdAndUpdate(
+    // Supprimer l'ancienne vidéo si elle existe
+    const talent = await Talent.findById(id);
+    if (talent && talent.video_presentation_gridfs_id) {
+      await gridfsService.deleteFile(talent.video_presentation_gridfs_id);
+    }
+
+    // Uploader dans GridFS
+    const result = await gridfsService.uploadFile(
+      req.file.buffer,
+      filename,
+      {
+        talent_id: id,
+        contentType: req.file.mimetype,
+        type: 'video'
+      }
+    );
+
+    // Mettre à jour le talent
+    const updatedTalent = await Talent.findByIdAndUpdate(
       id,
-      { video_presentation: relativePath },
+      {
+        video_presentation: filename, // Garde pour compatibilité
+        video_presentation_gridfs_id: result.fileId
+      },
       { new: true }
     );
 
-    if (!talent) {
-      fs.removeSync(req.file.path);
+    if (!updatedTalent) {
+      await gridfsService.deleteFile(result.fileId);
       return res.status(404).json({ error: 'Talent non trouvé' });
     }
 
     res.json({
       message: 'Vidéo uploadée avec succès',
-      video_path: relativePath
+      video_path: filename,
+      gridfs_id: result.fileId
     });
   } catch (error) {
-    if (req.file) {
-      fs.removeSync(req.file.path);
-    }
+    console.error('Erreur upload video:', error);
     res.status(500).json({ error: 'Erreur lors de l\'enregistrement de la vidéo' });
   }
 };
@@ -148,37 +166,50 @@ const uploadCV = async (req, res) => {
       return res.status(400).json({ error: 'Aucun fichier uploadé' });
     }
 
-    const relativePath = path.join('cvs', req.file.filename);
+    // Générer un nom de fichier unique
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(req.file.originalname);
+    const filename = `cv-${id}-${uniqueSuffix}${ext}`;
 
     // Supprimer l'ancien CV s'il existe
     const talent = await Talent.findById(id);
-    if (talent && talent.cv_pdf) {
-      const oldFilePath = path.join(__dirname, '../../uploads', talent.cv_pdf);
-      if (fs.existsSync(oldFilePath)) {
-        fs.removeSync(oldFilePath);
-      }
+    if (talent && talent.cv_pdf_gridfs_id) {
+      await gridfsService.deleteFile(talent.cv_pdf_gridfs_id);
     }
 
-    // Mettre à jour le talent avec le nouveau CV
+    // Uploader dans GridFS
+    const result = await gridfsService.uploadFile(
+      req.file.buffer,
+      filename,
+      {
+        talent_id: id,
+        contentType: req.file.mimetype,
+        type: 'cv_pdf'
+      }
+    );
+
+    // Mettre à jour le talent
     const updatedTalent = await Talent.findByIdAndUpdate(
       id,
-      { cv_pdf: relativePath },
+      {
+        cv_pdf: filename, // Garde pour compatibilité
+        cv_pdf_gridfs_id: result.fileId
+      },
       { new: true }
     );
 
     if (!updatedTalent) {
-      fs.removeSync(req.file.path);
+      await gridfsService.deleteFile(result.fileId);
       return res.status(404).json({ error: 'Talent non trouvé' });
     }
 
     res.json({
       message: 'CV PDF uploadé avec succès',
-      cv_pdf: relativePath
+      cv_pdf: filename,
+      gridfs_id: result.fileId
     });
   } catch (error) {
-    if (req.file) {
-      fs.removeSync(req.file.path);
-    }
+    console.error('Erreur upload CV:', error);
     res.status(500).json({ error: 'Erreur lors de l\'enregistrement du CV' });
   }
 };
@@ -194,15 +225,17 @@ const deletePhoto = async (req, res) => {
       return res.status(404).json({ error: 'Photo non trouvée' });
     }
 
-    // Supprimer le fichier
-    const filePath = path.join(__dirname, '../../uploads', photo.chemin);
-    fs.removeSync(filePath);
+    // Supprimer de GridFS si gridfs_id existe
+    if (photo.gridfs_id) {
+      await gridfsService.deleteFile(photo.gridfs_id);
+    }
 
     // Supprimer de la base de données
     await Photo.findByIdAndDelete(photoId);
 
     res.json({ message: 'Photo supprimée avec succès' });
   } catch (error) {
+    console.error('Erreur suppression photo:', error);
     res.status(500).json({ error: 'Erreur lors de la suppression' });
   }
 };
