@@ -27,11 +27,21 @@ const getGridFSBucket = () => {
 };
 
 // Uploader un fichier dans GridFS
-const uploadFile = (file, filename, metadata = {}) => {
+// file doit être un Buffer Node.js
+const uploadFile = (fileBuffer, filename, metadata = {}) => {
   return new Promise((resolve, reject) => {
     const bucket = getGridFSBucket();
+    
+    // S'assurer que c'est un Buffer
+    const buffer = fileBuffer instanceof Buffer 
+      ? fileBuffer 
+      : Buffer.from(fileBuffer);
+    
     const uploadStream = bucket.openUploadStream(filename, {
-      metadata: metadata
+      metadata: {
+        ...metadata,
+        contentType: metadata.contentType || 'application/octet-stream'
+      }
     });
 
     uploadStream.on('error', (error) => {
@@ -46,7 +56,7 @@ const uploadFile = (file, filename, metadata = {}) => {
     });
 
     // Écrire le buffer du fichier
-    uploadStream.end(file.buffer);
+    uploadStream.end(buffer);
   });
 };
 

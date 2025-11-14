@@ -66,8 +66,13 @@ const uploadPhoto = async (req, res) => {
     const filename = `photo-${id}-${uniqueSuffix}${ext}`;
 
     // Uploader dans GridFS
+    // Convertir ArrayBuffer en Buffer si nécessaire
+    const fileBuffer = req.file.buffer instanceof Buffer 
+      ? req.file.buffer 
+      : Buffer.from(req.file.buffer);
+    
     const result = await gridfsService.uploadFile(
-      req.file.buffer,
+      fileBuffer,
       filename,
       {
         talent_id: id,
@@ -121,8 +126,13 @@ const uploadVideo = async (req, res) => {
     }
 
     // Uploader dans GridFS
+    // Convertir ArrayBuffer en Buffer si nécessaire
+    const fileBuffer = req.file.buffer instanceof Buffer 
+      ? req.file.buffer 
+      : Buffer.from(req.file.buffer);
+    
     const result = await gridfsService.uploadFile(
-      req.file.buffer,
+      fileBuffer,
       filename,
       {
         talent_id: id,
@@ -178,8 +188,13 @@ const uploadCV = async (req, res) => {
     }
 
     // Uploader dans GridFS
+    // Convertir ArrayBuffer en Buffer si nécessaire
+    const fileBuffer = req.file.buffer instanceof Buffer 
+      ? req.file.buffer 
+      : Buffer.from(req.file.buffer);
+    
     const result = await gridfsService.uploadFile(
-      req.file.buffer,
+      fileBuffer,
       filename,
       {
         talent_id: id,
