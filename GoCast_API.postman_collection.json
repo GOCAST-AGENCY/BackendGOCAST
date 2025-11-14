@@ -1,0 +1,257 @@
+{
+	"info": {
+		"name": "GoCast API",
+		"description": "Collection Postman pour tester l'API GoCast",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Login",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}"
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/auth/login",
+							"protocol": "http",
+							"host": ["localhost"],
+							"port": "3000",
+							"path": ["api", "auth", "login"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Verify Token",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "http://localhost:3000/api/auth/verify",
+							"protocol": "http",
+							"host": ["localhost"],
+							"port": "3000",
+							"path": ["api", "auth", "verify"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Talents",
+			"item": [
+				{
+					"name": "Get All Talents",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:3000/api/talents",
+							"protocol": "http",
+							"host": ["localhost"],
+							"port": "3000",
+							"path": ["api", "talents"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Talent by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:3000/api/talents/:id",
+							"protocol": "http",
+							"host": ["localhost"],
+							"port": "3000",
+							"path": ["api", "talents", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Talent - Acteur",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nom\": \"Dupont\",\n  \"prenom\": \"Jean\",\n  \"email\": \"jean.dupont@example.com\",\n  \"telephone\": \"+33 6 12 34 56 78\",\n  \"date_naissance\": \"1990-05-15\",\n  \"genre\": \"Homme\",\n  \"specialite\": \"Acteur\",\n  \"type_acting\": \"Drame\",\n  \"cv_texte\": \"Acteur expérimenté avec 10 ans d'expérience au théâtre et au cinéma. Formation au Conservatoire de Paris.\",\n  \"statut\": \"Actif\",\n  \"note_interne\": \"Excellent pour les rôles dramatiques\",\n  \"commentaire\": \"Disponible pour tournages à partir de mars 2024\"\n}"
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/talents",
+							"protocol": "http",
+							"host": ["localhost"],
+							"port": "3000",
+							"path": ["api", "talents"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Talent - Mannequin",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nom\": \"Bernard\",\n  \"prenom\": \"Marie\",\n  \"email\": \"marie.bernard@example.com\",\n  \"telephone\": \"+33 6 98 76 54 32\",\n  \"date_naissance\": \"1998-03-10\",\n  \"genre\": \"Femme\",\n  \"specialite\": \"Mannequin\",\n  \"cv_texte\": \"Mannequin professionnel, taille 1m75, expérience dans la mode et la publicité.\",\n  \"statut\": \"Actif\",\n  \"note_interne\": \"Très photogénique\",\n  \"commentaire\": \"Spécialisée en mode haute couture\"\n}"
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/talents",
+							"protocol": "http",
+							"host": ["localhost"],
+							"port": "3000",
+							"path": ["api", "talents"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Talent - Minimal",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nom\": \"Martin\",\n  \"prenom\": \"Sophie\",\n  \"date_naissance\": \"1995-08-20\",\n  \"specialite\": \"Acteur\"\n}"
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/talents",
+							"protocol": "http",
+							"host": ["localhost"],
+							"port": "3000",
+							"path": ["api", "talents"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Talent",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"statut\": \"En pause\",\n  \"commentaire\": \"Mise à jour du profil\"\n}"
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/talents/:id",
+							"protocol": "http",
+							"host": ["localhost"],
+							"port": "3000",
+							"path": ["api", "talents", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Talent",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "http://localhost:3000/api/talents/:id",
+							"protocol": "http",
+							"host": ["localhost"],
+							"port": "3000",
+							"path": ["api", "talents", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "token",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
+
