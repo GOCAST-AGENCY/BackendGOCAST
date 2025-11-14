@@ -1,8 +1,6 @@
 const mongoose = require('mongoose');
-const Grid = require('gridfs-stream');
 const { GridFSBucket } = require('mongodb');
 
-let gfs;
 let gridFSBucket;
 
 // Initialiser GridFS
@@ -13,10 +11,6 @@ const initGridFS = () => {
   gridFSBucket = new GridFSBucket(conn.db, {
     bucketName: 'uploads'
   });
-  
-  // GridFS Stream (pour compatibilité)
-  gfs = Grid(conn.db, mongoose.mongo);
-  gfs.collection('uploads');
   
   console.log('✅ GridFS initialisé');
 };
@@ -112,32 +106,39 @@ const deleteFile = async (fileId) => {
 };
 
 // Stream un fichier (pour servir directement)
-const streamFile = (fileId, res) => {
+const streamFile = async (fileId, res) => {
   const bucket = getGridFSBucket();
   const ObjectId = mongoose.Types.ObjectId;
   
   try {
+    // Vérifier que le fichier existe
+    const fileInfo = await getFileInfo(fileId);
+    if (!fileInfo) {
+      return res.status(404).json({ error: 'Fichier non trouvé' });
+    }
+    
+    // Définir les headers
+    res.set({
+      'Content-Type': fileInfo.contentType || 'application/octet-stream',
+      'Content-Length': fileInfo.length,
+      'Content-Disposition': `inline; filename="${fileInfo.filename}"`,
+      'Cache-Control': 'public, max-age=31536000' // Cache 1 an
+    });
+    
+    // Stream le fichier
     const downloadStream = bucket.openDownloadStream(new ObjectId(fileId));
     
     downloadStream.on('error', (error) => {
-      if (error.message.includes('FileNotFound')) {
-        return res.status(404).json({ error: 'Fichier non trouvé' });
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Erreur lors de la récupération du fichier' });
       }
-      res.status(500).json({ error: 'Erreur lors de la récupération du fichier' });
-    });
-    
-    // Définir les headers appropriés
-    downloadStream.on('file', (file) => {
-      res.set({
-        'Content-Type': file.contentType || 'application/octet-stream',
-        'Content-Length': file.length,
-        'Content-Disposition': `inline; filename="${file.filename}"`
-      });
     });
     
     downloadStream.pipe(res);
   } catch (error) {
-    res.status(500).json({ error: 'Erreur lors de la récupération du fichier' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Erreur lors de la récupération du fichier' });
+    }
   }
 };
 

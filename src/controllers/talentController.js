@@ -1,6 +1,7 @@
 const Talent = require('../models/Talent');
 const Photo = require('../models/Photo');
 const { calculerTrancheAge } = require('../database/db');
+const gridfsService = require('../services/gridfsService');
 const path = require('path');
 const fs = require('fs-extra');
 
@@ -55,7 +56,8 @@ const getAllTalents = async (req, res) => {
           _id: talentObj._id.toString(),
           photos: photos.map(photo => ({
             ...photo.toObject(),
-            id: photo._id.toString()
+            id: photo._id.toString(),
+            gridfs_id: photo.gridfs_id || null
           }))
         };
       })
@@ -88,7 +90,8 @@ const getTalentById = async (req, res) => {
       _id: talentObj._id.toString(),
       photos: photos.map(photo => ({
         ...photo.toObject(),
-        id: photo._id.toString()
+        id: photo._id.toString(),
+        gridfs_id: photo.gridfs_id || null
       }))
     });
   } catch (error) {
@@ -184,24 +187,36 @@ const deleteTalent = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Récupérer les chemins des fichiers associés
-    const photos = await Photo.find({ talent_id: id });
-
-    // Supprimer les fichiers
-    photos.forEach(photo => {
-      const filePath = path.join(__dirname, '../../uploads', photo.chemin);
-      fs.removeSync(filePath);
-    });
-
-    // Supprimer les photos de la base de données
-    await Photo.deleteMany({ talent_id: id });
-
-    // Supprimer le talent
-    const talent = await Talent.findByIdAndDelete(id);
-
+    // Récupérer le talent avant de le supprimer
+    const talent = await Talent.findById(id);
+    
     if (!talent) {
       return res.status(404).json({ error: 'Talent non trouvé' });
     }
+
+    // Récupérer les chemins des fichiers associés
+    const photos = await Photo.find({ talent_id: id });
+
+    // Supprimer les fichiers de GridFS
+    for (const photo of photos) {
+      if (photo.gridfs_id) {
+        await gridfsService.deleteFile(photo.gridfs_id);
+      }
+    }
+
+    // Supprimer les photos de la base de données
+    await Photo.deleteMany({ talent_id: id });
+    
+    // Supprimer le CV et la vidéo de GridFS si ils existent
+    if (talent.cv_pdf_gridfs_id) {
+      await gridfsService.deleteFile(talent.cv_pdf_gridfs_id);
+    }
+    if (talent.video_presentation_gridfs_id) {
+      await gridfsService.deleteFile(talent.video_presentation_gridfs_id);
+    }
+
+    // Supprimer le talent
+    await Talent.findByIdAndDelete(id);
 
     res.json({ message: 'Talent supprimé avec succès' });
   } catch (error) {
