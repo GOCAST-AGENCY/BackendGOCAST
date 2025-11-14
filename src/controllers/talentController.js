@@ -48,7 +48,7 @@ const getAllTalents = async (req, res) => {
     // Récupérer les photos pour chaque talent
     const talentsWithPhotos = await Promise.all(
       talents.map(async (talent) => {
-        const photos = await Photo.find({ talent_id: talent._id }).select('-base64');
+        const photos = await Photo.find({ talent_id: talent._id });
         const talentObj = talent.toObject();
         
         // Retirer les base64 pour économiser la bande passante
@@ -59,11 +59,17 @@ const getAllTalents = async (req, res) => {
           ...talentObj,
           id: talentObj._id.toString(),
           _id: talentObj._id.toString(),
-          photos: photos.map(photo => ({
-            ...photo.toObject(),
-            id: photo._id.toString(),
-            hasBase64: !!photo.base64 // Indique si base64 existe
-          }))
+          photos: photos.map(photo => {
+            const photoObj = photo.toObject();
+            const hasBase64 = !!photoObj.base64;
+            // Retirer le base64 avant d'envoyer
+            delete photoObj.base64;
+            return {
+              ...photoObj,
+              id: photoObj._id.toString(),
+              hasBase64: hasBase64 // Indique si base64 existe
+            };
+          })
         };
       })
     );
@@ -85,8 +91,8 @@ const getTalentById = async (req, res) => {
       return res.status(404).json({ error: 'Talent non trouvé' });
     }
 
-    // Récupérer les photos (sans base64 pour économiser la bande passante)
-    const photos = await Photo.find({ talent_id: talent._id }).select('-base64');
+    // Récupérer les photos (avec base64 pour vérifier, mais on ne l'enverra pas)
+    const photos = await Photo.find({ talent_id: talent._id });
     const talentObj = talent.toObject();
 
     // Retirer les base64 du talent pour économiser la bande passante
@@ -97,11 +103,17 @@ const getTalentById = async (req, res) => {
       ...talentObj,
       id: talentObj._id.toString(),
       _id: talentObj._id.toString(),
-      photos: photos.map(photo => ({
-        ...photo.toObject(),
-        id: photo._id.toString(),
-        hasBase64: !!photo.base64 // Indique si base64 existe sans l'envoyer
-      }))
+      photos: photos.map(photo => {
+        const photoObj = photo.toObject();
+        const hasBase64 = !!photoObj.base64;
+        // Retirer le base64 avant d'envoyer
+        delete photoObj.base64;
+        return {
+          ...photoObj,
+          id: photoObj._id.toString(),
+          hasBase64: hasBase64 // Indique si base64 existe
+        };
+      })
     });
   } catch (error) {
     res.status(500).json({ error: 'Erreur serveur' });
