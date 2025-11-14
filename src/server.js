@@ -50,6 +50,15 @@ app.listen(PORT, () => {
   console.log(`🚀 Serveur démarré sur le port ${PORT}`);
   console.log(`📍 Environnement: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🌐 URL: http://localhost:${PORT}`);
+}).on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`❌ Le port ${PORT} est déjà utilisé.`);
+    console.error(`💡 Arrêtez le processus qui utilise ce port ou changez le port dans .env`);
+    process.exit(1);
+  } else {
+    console.error('❌ Erreur lors du démarrage du serveur:', err);
+    process.exit(1);
+  }
 });
 
 module.exports = app;

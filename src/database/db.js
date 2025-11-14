@@ -14,10 +14,7 @@ fs.ensureDirSync(path.join(uploadsDir, 'cvs'));
 // Connexion à MongoDB
 const connectDB = async () => {
   try {
-    await mongoose.connect(config.database.url, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    await mongoose.connect(config.database.url);
     console.log('✅ Connexion à MongoDB établie');
     
     // Créer l'admin par défaut si nécessaire
