@@ -17,7 +17,10 @@ const PORT = process.env.PORT || 3000;
 connectDB();
 
 // Middlewares
-app.use(helmet()); // Sécurité HTTP
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: false // Désactiver CSP pour permettre les images
+})); // Sécurité HTTP
 
 // Configuration CORS - Autoriser le frontend Netlify et localhost
 const allowedOrigins = [

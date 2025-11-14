@@ -37,10 +37,14 @@ const uploadFile = (fileBuffer, filename, metadata = {}) => {
       ? fileBuffer 
       : Buffer.from(fileBuffer);
     
+    // Définir le contentType directement dans les options GridFS
+    const contentType = metadata.contentType || 'application/octet-stream';
+    
     const uploadStream = bucket.openUploadStream(filename, {
+      contentType: contentType,
       metadata: {
         ...metadata,
-        contentType: metadata.contentType || 'application/octet-stream'
+        contentType: contentType
       }
     });
 
@@ -127,12 +131,38 @@ const streamFile = async (fileId, res) => {
       return res.status(404).json({ error: 'Fichier non trouvé' });
     }
     
+    // Déterminer le Content-Type
+    let contentType = 'application/octet-stream';
+    if (fileInfo.contentType) {
+      contentType = fileInfo.contentType;
+    } else if (fileInfo.metadata && fileInfo.metadata.contentType) {
+      contentType = fileInfo.metadata.contentType;
+    } else {
+      // Deviner le type depuis l'extension
+      const ext = fileInfo.filename.split('.').pop()?.toLowerCase();
+      const mimeTypes = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'webp': 'image/webp',
+        'mp4': 'video/mp4',
+        'webm': 'video/webm',
+        'mov': 'video/quicktime',
+        'pdf': 'application/pdf'
+      };
+      if (ext && mimeTypes[ext]) {
+        contentType = mimeTypes[ext];
+      }
+    }
+    
     // Définir les headers
     res.set({
-      'Content-Type': fileInfo.contentType || 'application/octet-stream',
+      'Content-Type': contentType,
       'Content-Length': fileInfo.length,
       'Content-Disposition': `inline; filename="${fileInfo.filename}"`,
-      'Cache-Control': 'public, max-age=31536000' // Cache 1 an
+      'Cache-Control': 'public, max-age=31536000', // Cache 1 an
+      'Access-Control-Allow-Origin': '*' // Pour CORS
     });
     
     // Stream le fichier
@@ -146,6 +176,7 @@ const streamFile = async (fileId, res) => {
     
     downloadStream.pipe(res);
   } catch (error) {
+    console.error('Erreur streamFile:', error);
     if (!res.headersSent) {
       res.status(500).json({ error: 'Erreur lors de la récupération du fichier' });
     }

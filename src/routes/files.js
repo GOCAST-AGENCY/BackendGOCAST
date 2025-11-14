@@ -25,12 +25,19 @@ router.get('/photo/:photoId', async (req, res) => {
     }
     
     if (!photo.gridfs_id) {
+      // Fallback: essayer de servir depuis le chemin local si disponible
+      if (photo.chemin) {
+        return res.redirect(`/uploads/${photo.chemin}`);
+      }
       return res.status(404).json({ error: 'Fichier non trouvé dans GridFS' });
     }
     
-    gridfsService.streamFile(photo.gridfs_id, res);
+    await gridfsService.streamFile(photo.gridfs_id, res);
   } catch (error) {
-    res.status(500).json({ error: 'Erreur lors de la récupération de la photo' });
+    console.error('Erreur récupération photo:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Erreur lors de la récupération de la photo' });
+    }
   }
 });
 
@@ -41,12 +48,19 @@ router.get('/talent/:talentId/cv', async (req, res) => {
     const talent = await Talent.findById(talentId);
     
     if (!talent || !talent.cv_pdf_gridfs_id) {
+      // Fallback: essayer le chemin local
+      if (talent && talent.cv_pdf) {
+        return res.redirect(`/uploads/${talent.cv_pdf}`);
+      }
       return res.status(404).json({ error: 'CV non trouvé' });
     }
     
-    gridfsService.streamFile(talent.cv_pdf_gridfs_id, res);
+    await gridfsService.streamFile(talent.cv_pdf_gridfs_id, res);
   } catch (error) {
-    res.status(500).json({ error: 'Erreur lors de la récupération du CV' });
+    console.error('Erreur récupération CV:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Erreur lors de la récupération du CV' });
+    }
   }
 });
 
@@ -57,12 +71,19 @@ router.get('/talent/:talentId/video', async (req, res) => {
     const talent = await Talent.findById(talentId);
     
     if (!talent || !talent.video_presentation_gridfs_id) {
+      // Fallback: essayer le chemin local
+      if (talent && talent.video_presentation) {
+        return res.redirect(`/uploads/${talent.video_presentation}`);
+      }
       return res.status(404).json({ error: 'Vidéo non trouvée' });
     }
     
-    gridfsService.streamFile(talent.video_presentation_gridfs_id, res);
+    await gridfsService.streamFile(talent.video_presentation_gridfs_id, res);
   } catch (error) {
-    res.status(500).json({ error: 'Erreur lors de la récupération de la vidéo' });
+    console.error('Erreur récupération vidéo:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Erreur lors de la récupération de la vidéo' });
+    }
   }
 });
 
