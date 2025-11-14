@@ -21,7 +21,13 @@ const connectDB = async () => {
     await createDefaultAdmin();
   } catch (error) {
     console.error('❌ Erreur de connexion à MongoDB:', error.message);
-    process.exit(1);
+    console.error('💡 Vérifiez que:');
+    console.error('   1. MongoDB Atlas est accessible');
+    console.error('   2. L\'IP de Render est dans la whitelist MongoDB Atlas');
+    console.error('   3. Les identifiants MongoDB sont corrects dans les variables d\'environnement');
+    console.error('   4. Le serveur continuera à fonctionner mais les requêtes DB échoueront');
+    // Ne pas faire crasher le serveur, mais loguer l'erreur
+    // Le serveur pourra répondre aux requêtes mais les appels DB échoueront
   }
 };
 

@@ -18,7 +18,32 @@ connectDB();
 
 // Middlewares
 app.use(helmet()); // Sécurité HTTP
-app.use(cors()); // Gestion CORS
+
+// Configuration CORS - Autoriser le frontend Netlify et localhost
+const allowedOrigins = [
+  'https://gocast.netlify.app',
+  'http://localhost:3001',
+  'http://localhost:3000'
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Autoriser les requêtes sans origin (Postman, curl, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Pour le développement, autoriser toutes les origines
+      // En production, décommentez la ligne suivante :
+      // callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(morgan('dev')); // Logging des requêtes
 app.use(express.json()); // Parser JSON
 app.use(express.urlencoded({ extended: true })); // Parser URL-encoded
